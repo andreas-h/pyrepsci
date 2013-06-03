@@ -35,13 +35,19 @@ from tables.nodes import filenode
 # Save script to datastore
 # ============================================================================
 
-def save_script_to_datastore(datastore, filename="prepare_data.py"):
+def save_script_to_datastore(datastore, filename="prepare_data.py",
+        path=path_doc):
     """Save the current Python script to a datastore."""
     caller = inspect.getframeinfo(inspect.currentframe().f_back)[0]
     with open(caller, "r") as fd:
         DATA = fd.read()
     store = pd.HDFStore(datastore, "a")
-    store._handle.createArray('/documentation', filename, DATA)
+    if path not in [n.__repr__().split("(")[0].strip()[1:] for n in
+            store._handle.iterNodes('/')]:
+        store._handle.createGroup('/', path)
+    if path[0] != "/":
+        path = "/{0}".format(path)
+    store._handle.createArray(path, filename, DATA)
     store.close()
 
 
