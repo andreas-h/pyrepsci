@@ -25,9 +25,7 @@ try:
 except ImportError:
     from urllib.request import urlretrieve
 
-# TODO: Check if this requirement can be lowered. It doesn't work with
-#       0.8.1
-pkg_resources.require("pandas>=0.11.0")
+pkg_resources.require("pandas>=0.10.1")
 import pandas as pd
 from tables.nodes import filenode
 
@@ -38,16 +36,21 @@ from tables.nodes import filenode
 def save_script_to_datastore(datastore, filename="prepare_data.py",
         path=path_doc):
     """Save the current Python script to a datastore."""
+    # pandas API change between 0.10.1 and 0.11
+    try:
+        _h = datastore.handle
+    except:
+        _h = datastore._handle
     caller = inspect.getframeinfo(inspect.currentframe().f_back)[0]
     with open(caller, "r") as fd:
         DATA = fd.read()
     store = pd.HDFStore(datastore, "a")
     if path not in [n.__repr__().split("(")[0].strip()[1:] for n in
-            store._handle.iterNodes('/')]:
-        store._handle.createGroup('/', path)
+            _h.iterNodes('/')]:
+        _h.createGroup('/', path)
     if path[0] != "/":
         path = "/{0}".format(path)
-    store._handle.createArray(path, filename, DATA)
+    _h.createArray(path, filename, DATA)
     store.close()
 
 
@@ -55,8 +58,13 @@ def save_script_to_datastore(datastore, filename="prepare_data.py",
 # ============================================================================
 
 def retrieve_srcdata(datastore, data_filename, output_filename):
+    # pandas API change between 0.10.1 and 0.11
+    try:
+        _h = datastore.handle
+    except:
+        _h = datastore._handle
     store = pd.HDFStore(datastore, "r")
-    fnode = filenode.openNode(store._handle.getNode(where="/{0}".format(path_src),
+    fnode = filenode.openNode(_h.getNode(where="/{0}".format(path_src),
             name=data_filename))
     DATA = fnode.read()
     fnode.close()
@@ -89,6 +97,11 @@ def save_pandas(datastore, dataobj, varname, datasource_filename=None):
 
 def download_and_store(url, datastore, data_filename=None, overwrite=False,
         download_reference=None):
+    # pandas API change between 0.10.1 and 0.11
+    try:
+        _h = datastore.handle
+    except:
+        _h = datastore._handle
     # set data_filename from the URL if not explicitly defined
     if not data_filename:
         data_filename = url.split('/')[-1]
@@ -96,10 +109,10 @@ def download_and_store(url, datastore, data_filename=None, overwrite=False,
     if os.access(datastore, os.R_OK):
         store = pd.HDFStore(datastore, "a")
         src_filenames = [n.__repr__().split("(")[0].strip()[1:].split("/")[1]
-                for n in store._handle.iterNodes('/{0}'.format(path_src))]
+                for n in _h.iterNodes('/{0}'.format(path_src))]
         if data_filename in src_filenames:
             if overwrite:
-                store._handle.removeNode("/{0}/{1}".format(path_src,
+                _h.removeNode("/{0}/{1}".format(path_src,
                         data_filename))
             else:
                 raise AttributeError("Data file cannot be saved: filename "
@@ -110,14 +123,14 @@ def download_and_store(url, datastore, data_filename=None, overwrite=False,
                 complib=complib)
     # prepare datastore
     if path_data not in [n.__repr__().split("(")[0].strip()[1:] for n in
-            store._handle.iterNodes('/')]:
-        store._handle.createGroup('/', path_data)
+            _h.iterNodes('/')]:
+        _h.createGroup('/', path_data)
     if path_src not in [n.__repr__().split("(")[0].strip()[1:] for n in
-            store._handle.iterNodes('/')]:
-        store._handle.createGroup('/', path_src)
+            _h.iterNodes('/')]:
+        _h.createGroup('/', path_src)
     if path_doc not in [n.__repr__().split("(")[0].strip()[1:] for n in
-            store._handle.iterNodes('/')]:
-        store._handle.createGroup('/', path_doc)
+            _h.iterNodes('/')]:
+        _h.createGroup('/', path_doc)
     # retrieve file
     # TODO: find out if download was successful
     localfile = tempfile.mktemp()
@@ -125,12 +138,12 @@ def download_and_store(url, datastore, data_filename=None, overwrite=False,
     with open(localfile, "rb") as fd:
         rawdata = fd.read()
     # save retrieved file to datastore
-    fnode = filenode.newNode(store._handle, where="/{0}".format(path_src),
+    fnode = filenode.newNode(_h, where="/{0}".format(path_src),
             name=data_filename)
     fnode.write(rawdata)
     fnode.close()
     # create metadata
-    srcnode = store._handle.getNode("/{0}".format(path_src), data_filename)
+    srcnode = _h.getNode("/{0}".format(path_src), data_filename)
     srcnode.attrs.DOWNLOAD_URL = url
     srcnode.attrs.DOWNLOAD_DATE = datetime.datetime.now().isoformat()
     if download_reference:
