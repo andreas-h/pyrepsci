@@ -36,15 +36,15 @@ from tables.nodes import filenode
 def save_script_to_datastore(datastore, filename="prepare_data.py",
         path=path_doc):
     """Save the current Python script to a datastore."""
+    caller = inspect.getframeinfo(inspect.currentframe().f_back)[0]
+    with open(caller, "r") as fd:
+        DATA = fd.read()
+    store = pd.HDFStore(datastore, "a")
     # pandas API change between 0.10.1 and 0.11
     try:
         _h = store.handle
     except:
         _h = store._handle
-    caller = inspect.getframeinfo(inspect.currentframe().f_back)[0]
-    with open(caller, "r") as fd:
-        DATA = fd.read()
-    store = pd.HDFStore(datastore, "a")
     if path not in [n.__repr__().split("(")[0].strip()[1:] for n in
             _h.iterNodes('/')]:
         _h.createGroup('/', path)
@@ -58,12 +58,12 @@ def save_script_to_datastore(datastore, filename="prepare_data.py",
 # ============================================================================
 
 def retrieve_srcdata(datastore, data_filename, output_filename):
+    store = pd.HDFStore(datastore, "r")
     # pandas API change between 0.10.1 and 0.11
     try:
         _h = store.handle
     except:
         _h = store._handle
-    store = pd.HDFStore(datastore, "r")
     fnode = filenode.openNode(_h.getNode(where="/{0}".format(path_src),
             name=data_filename))
     DATA = fnode.read()
@@ -97,17 +97,17 @@ def save_pandas(datastore, dataobj, varname, datasource_filename=None):
 
 def download_and_store(url, datastore, data_filename=None, overwrite=False,
         download_reference=None):
-    # pandas API change between 0.10.1 and 0.11
-    try:
-        _h = store.handle
-    except:
-        _h = store._handle
     # set data_filename from the URL if not explicitly defined
     if not data_filename:
         data_filename = url.split('/')[-1]
     # if datastore exists, check if filename already exists in datastore
     if os.access(datastore, os.R_OK):
         store = pd.HDFStore(datastore, "a")
+        # pandas API change between 0.10.1 and 0.11
+        try:
+            _h = store.handle
+        except:
+            _h = store._handle
         src_filenames = [n.__repr__().split("(")[0].strip()[1:].split("/")[1]
                 for n in _h.iterNodes('/{0}'.format(path_src))]
         if data_filename in src_filenames:
@@ -121,6 +121,11 @@ def download_and_store(url, datastore, data_filename=None, overwrite=False,
     else:
         store = pd.HDFStore(datastore, "w", complevel=complevel,
                 complib=complib)
+        # pandas API change between 0.10.1 and 0.11
+        try:
+            _h = store.handle
+        except:
+            _h = store._handle
     # prepare datastore
     if path_data not in [n.__repr__().split("(")[0].strip()[1:] for n in
             _h.iterNodes('/')]:
